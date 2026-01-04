@@ -2,17 +2,8 @@ use std::str::FromStr;
 
 fn main() -> anyhow::Result<()> {
     let input = aoc::fetch_puzzle_input(1)?;
-    //     let input = r"L68
-    // L30
-    // R48
-    // L5
-    // R60
-    // L55
-    // L1
-    // L99
-    // R14
-    // L82";
     println!("part1 ans -> {}", part1(&input)?);
+    println!("part2 ans -> {}", part2(&input)?);
     Ok(())
 }
 fn parse_input(input: &str) -> anyhow::Result<Vec<Rotation>> {
@@ -49,28 +40,64 @@ impl FromStr for Rotation {
 
 fn part1(input: &str) -> anyhow::Result<String> {
     let rotations = parse_input(input)?;
-    let mut x = 50;
-    let mut total = 0;
-    for rot in rotations {
-        let x2 = match rot {
-            Rotation::Left(n) => x - n,
-            Rotation::Right(n) => x + n,
-        };
-        x = x2 % 100;
-        if x == 0 {
-            total += 1;
-            continue;
-        }
+    let mut dial = 50;
 
-        if x2 < 0 {
-            x += 100;
-        }
-    }
+    let total = rotations
+        .iter()
+        .map(|rot| {
+            dial = match rot {
+                Rotation::Left(n) => dial - n,
+                Rotation::Right(n) => dial + n,
+            }
+            .rem_euclid(100);
+            dial
+        })
+        .filter(|d| *d == 0)
+        .count();
 
     Ok(total.to_string())
 }
 
-#[test]
-fn test() {
-    println!("{}", -700i32 % 100)
+fn part2(input: &str) -> anyhow::Result<String> {
+    let rotations = parse_input(input)?;
+    let mut dial = 50;
+    let total: usize = rotations
+        .iter()
+        .map(|rot| match rot {
+            Rotation::Left(n) => {
+                let (d, crossings) = rotate_left(dial, *n);
+                dial = d;
+                crossings
+            }
+            Rotation::Right(n) => {
+                let (d, crossings) = rotate_right(dial, *n);
+                dial = d;
+                crossings
+            }
+        })
+        .sum();
+
+    Ok(total.to_string())
+}
+
+fn rotate_right(mut dial: i32, value: i32) -> (i32, usize) {
+    let mut crossings = (value / 100).unsigned_abs() as usize; // If the rotation is greater than 100, then we will cross it value / 100 times (integer division).
+    let value = value % 100; // Now we can take care of the remainder of the last rotation
+
+    if (dial + value) >= 100 {
+        crossings += 1;
+    }
+    dial = (dial + value).rem_euclid(100);
+    (dial, crossings)
+}
+
+fn rotate_left(mut dial: i32, value: i32) -> (i32, usize) {
+    let mut crossings = (value / 100).unsigned_abs() as usize; // If the rotation is greater than 100, then we will cross it value / 100 times (integer division).
+    let value = value % 100; // Now we can take care of the remainder of the last rotation
+
+    if (dial > 0) && ((dial - value) <= 0) {
+        crossings += 1;
+    }
+    dial = (dial - value).rem_euclid(100);
+    (dial, crossings)
 }
