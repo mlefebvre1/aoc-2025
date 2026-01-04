@@ -12,32 +12,51 @@ impl FromStr for Range {
         let mut ss = s.split("-");
         let start: usize = ss
             .next()
-            .ok_or(anyhow::anyhow!("should have a first id"))?
+            .ok_or(anyhow::anyhow!("should have a start id"))?
             .parse()?;
         let end: usize = ss
             .next()
-            .ok_or(anyhow::anyhow!("should have a second id"))?
+            .ok_or(anyhow::anyhow!("should have an end id"))?
             .parse()?;
         Ok(Range { start, end })
     }
 }
 impl Range {
-    fn find_invalids(&self) -> impl Iterator<Item = usize> {
+    fn find_invalids_part1(&self) -> impl Iterator<Item = usize> {
         (self.start..=self.end).filter(|x| {
             let digits = x.to_string();
-            digits.len() % 2 == 0
-                && digits[0..digits.len() / 2] == digits[digits.len() / 2..digits.len()]
+            //simply check that the lower-half of the number equals the upper-half of the number
+            digits[0..digits.len() / 2] == digits[digits.len() / 2..digits.len()]
+        })
+    }
+    fn find_invalids_part2(&self) -> impl Iterator<Item = usize> {
+        (self.start..=self.end).filter(|x| {
+            let digits = x.to_string();
+            for n in 1..=digits.len() / 2 {
+                /* We can't only check the lower and upper half only anymore. Instead we need to check from 1 digit to digits.len() / 2 possibilities.
+                Ex: for the number 565656 we would check the following possibilities:
+                n = 1 -> 5 6 5 6 5 6        token = 5       invalid = false
+                n = 2 -> 56 56 56           token = 56      invalid = true
+                n = 3 -> 565 565            token = 565     invalid = false <- would not be checked because it would return from i = 2
+                */
+                let token = &digits[0..n];
+                // if all the chunks equals the token, then we have found an invalid id, we can return true!
+                if (0..digits.len())
+                    .step_by(n)
+                    .map(|i| &digits[i..std::cmp::min(i + n, digits.len())])
+                    .all(|chunk| chunk == token)
+                {
+                    return true;
+                }
+            }
+            // None of the possibilities worked, so we don't have an invalid id
+            false
         })
     }
 }
-// 0..3. 3..6
-//101 101
 
 fn main() -> anyhow::Result<()> {
     let input = aoc::fetch_puzzle_input(2)?;
-    //     let input = "11-22,95-115,998-1012,1188511880-1188511890,222220-222224,
-    // 1698522-1698528,446443-446449,38593856-38593862,565653-565659,
-    // 824824821-824824827,2121212118-2121212124";
     println!("part1 ans -> {}", part1(&input)?);
     println!("part2 ans -> {}", part2(&input)?);
     Ok(())
@@ -51,9 +70,17 @@ fn parse_input(input: &str) -> anyhow::Result<Vec<Range>> {
 }
 fn part1(input: &str) -> anyhow::Result<String> {
     let ranges = parse_input(input)?;
-    let nb_invalids: usize = ranges.iter().flat_map(|range| range.find_invalids()).sum();
+    let nb_invalids: usize = ranges
+        .iter()
+        .flat_map(|range| range.find_invalids_part1())
+        .sum();
     Ok(nb_invalids.to_string())
 }
 fn part2(input: &str) -> anyhow::Result<String> {
-    Ok("".to_string())
+    let ranges = parse_input(input)?;
+    let nb_invalids: usize = ranges
+        .iter()
+        .flat_map(|range| range.find_invalids_part2())
+        .sum();
+    Ok(nb_invalids.to_string())
 }
