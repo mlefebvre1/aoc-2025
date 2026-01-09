@@ -16,89 +16,86 @@ impl FromStr for Op {
     }
 }
 
-fn parse_input(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
+fn parse_input1(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
+    // Number of lines before the operations line
+    let nb_nums_line = input.split("\n").take_while(|s| !s.contains("+")).count();
+
     let mut lines = input.split('\n').filter(|line| !line.is_empty());
 
-    let nums: Vec<Vec<u64>> = lines
+    // Extract and parse numbers
+    let nums = lines
         .by_ref()
-        .take(4)
+        .take(nb_nums_line)
         .map(|line| {
             line.split_whitespace()
-                .map(|s| s.parse::<u64>().unwrap())
+                .map(|s| s.parse::<u64>())
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Transpose problems to column (1 problem per operation)
+    let problems = (0..nums[0].len())
+        .map(|col| (0..nums.len()).map(|row| nums[row][col]).collect())
+        .collect();
+
+    // Extract the operations
+    let ops = lines
+        .next()
+        .ok_or(anyhow::anyhow!("No operations line found"))?
+        .split_whitespace()
+        .map(Op::from_str)
+        .collect::<Result<Vec<Op>, _>>()?;
+
+    Ok((problems, ops))
+}
+fn parse_input2(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
+    // Number of lines before the operations line
+    let nb_nums_line = input.split("\n").take_while(|s| !s.contains("+")).count();
+
+    let mut lines = input.split('\n').filter(|line| !line.is_empty());
+
+    // Collect first 4 lines as a Vec<Vec<char>>
+    let nums: Vec<Vec<char>> = lines
+        .by_ref()
+        .take(nb_nums_line)
+        .map(|line| line.chars().collect())
+        .collect();
+
+    // Transpose and clean each column of chars to form String
+    let nums2: Vec<String> = (0..nums[0].len())
+        .map(|col| {
+            (0..nums.len())
+                .map(|row| nums[row][col])
+                .filter(|c| !c.is_whitespace())
                 .collect()
         })
         .collect();
 
-    // Invert dimension
-    let mut problems = vec![];
-    for col in 0..nums[0].len() {
-        let mut p = vec![];
-        for row in 0..nums.len() {
-            p.push(nums[row][col]);
-        }
-        problems.push(p);
-    }
+    // Group by non-empty strings, splitting on empty as separators
+    let problems: Vec<Vec<u64>> = nums2
+        .split(|s| s.is_empty())
+        .filter(|group| !group.is_empty())
+        .map(|group| {
+            group
+                .iter()
+                .map(|s| s.parse::<u64>())
+                .collect::<Result<Vec<u64>, _>>()
+        })
+        .collect::<Result<Vec<Vec<u64>>, _>>()?;
 
-    let ops: anyhow::Result<Vec<Op>> = lines
+    // Extract the operations
+    let ops = lines
         .next()
-        .unwrap()
+        .ok_or(anyhow::anyhow!("No operations line found"))?
         .split_whitespace()
         .map(Op::from_str)
-        .collect();
+        .collect::<Result<Vec<Op>, _>>()?;
 
-    Ok((problems, ops?))
-}
-fn parse_input2(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
-    let mut lines = input.split('\n').filter(|line| !line.is_empty());
-
-    let nums: Vec<Vec<char>> = lines
-        .by_ref()
-        .take(4)
-        .map(|line| line.chars().collect())
-        .collect();
-
-    let mut nums2 = vec![];
-    for col in 0..nums[0].len() {
-        let mut num = vec![];
-        for row in 0..nums.len() {
-            num.push(nums[row][col]);
-        }
-
-        nums2.push(
-            num.iter()
-                .filter(|c| !c.is_whitespace())
-                .collect::<String>(),
-        );
-    }
-
-    let mut problems = vec![];
-    let mut problem = vec![];
-    for num in nums2 {
-        if num.is_empty() {
-            problems.push(problem.clone());
-            problem.clear();
-            continue;
-        }
-        problem.push(num.parse::<u64>()?);
-    }
-    problems.push(problem.clone());
-
-    let ops: anyhow::Result<Vec<Op>> = lines
-        .next()
-        .unwrap()
-        .split_whitespace()
-        .map(Op::from_str)
-        .collect();
-
-    Ok((problems, ops?))
+    Ok((problems, ops))
 }
 
 fn main() -> anyhow::Result<()> {
     let input = aoc::fetch_puzzle_input(6)?;
-    let input2 = "123 328  51 64 
- 45 64  387 23 
-  6 98  215 314
-*   +   *   +  ";
     println!("part1 ans -> {}", part1(&input)?);
     println!("part2 ans -> {}", part2(&input)?);
     Ok(())
@@ -122,10 +119,30 @@ fn solve(problems: Vec<Vec<u64>>, ops: Vec<Op>) -> u64 {
 }
 
 fn part1(input: &str) -> anyhow::Result<String> {
-    let (problems, ops) = parse_input(input)?;
+    let (problems, ops) = parse_input1(input)?;
     Ok(solve(problems, ops).to_string())
 }
 fn part2(input: &str) -> anyhow::Result<String> {
     let (problems, ops) = parse_input2(input)?;
     Ok(solve(problems, ops).to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static INPUT: &str = "123 328  51 64 
+ 45 64  387 23 
+  6 98  215 314
+*   +   *   +  ";
+
+    #[test]
+    fn test_part1() {
+        assert_eq!(part1(INPUT).unwrap(), "4277556");
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(INPUT).unwrap(), "3263827");
+    }
 }
