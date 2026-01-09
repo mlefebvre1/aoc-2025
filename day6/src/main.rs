@@ -17,7 +17,6 @@ impl FromStr for Op {
 }
 
 fn parse_input(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
-    // println!("input:\n{}", input);
     let mut lines = input.split('\n').filter(|line| !line.is_empty());
 
     let nums: Vec<Vec<u64>> = lines
@@ -26,18 +25,18 @@ fn parse_input(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
         .map(|line| {
             line.split_whitespace()
                 .map(|s| s.parse::<u64>().unwrap())
-                .collect::<Vec<_>>()
+                .collect()
         })
         .collect();
 
     // Invert dimension
-    let mut nums2 = vec![];
-    for j in 0..nums[0].len() {
+    let mut problems = vec![];
+    for col in 0..nums[0].len() {
         let mut p = vec![];
-        for i in 0..nums.len() {
-            p.push(nums[i][j]);
+        for row in 0..nums.len() {
+            p.push(nums[row][col]);
         }
-        nums2.push(p);
+        problems.push(p);
     }
 
     let ops: anyhow::Result<Vec<Op>> = lines
@@ -47,12 +46,51 @@ fn parse_input(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
         .map(Op::from_str)
         .collect();
 
-    println!("nums: {:?}, ops: {:?}", nums, ops);
-
-    Ok((nums2, ops?))
+    Ok((problems, ops?))
 }
 fn parse_input2(input: &str) -> anyhow::Result<(Vec<Vec<u64>>, Vec<Op>)> {
-    Ok((vec![], vec![]))
+    let mut lines = input.split('\n').filter(|line| !line.is_empty());
+
+    let nums: Vec<Vec<char>> = lines
+        .by_ref()
+        .take(4)
+        .map(|line| line.chars().collect())
+        .collect();
+
+    let mut nums2 = vec![];
+    for col in 0..nums[0].len() {
+        let mut num = vec![];
+        for row in 0..nums.len() {
+            num.push(nums[row][col]);
+        }
+
+        nums2.push(
+            num.iter()
+                .filter(|c| !c.is_whitespace())
+                .collect::<String>(),
+        );
+    }
+
+    let mut problems = vec![];
+    let mut problem = vec![];
+    for num in nums2 {
+        if num.is_empty() {
+            problems.push(problem.clone());
+            problem.clear();
+            continue;
+        }
+        problem.push(num.parse::<u64>()?);
+    }
+    problems.push(problem.clone());
+
+    let ops: anyhow::Result<Vec<Op>> = lines
+        .next()
+        .unwrap()
+        .split_whitespace()
+        .map(Op::from_str)
+        .collect();
+
+    Ok((problems, ops?))
 }
 
 fn main() -> anyhow::Result<()> {
@@ -66,8 +104,9 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn solve(nums: Vec<Vec<u64>>, ops: Vec<Op>) -> u64 {
-    nums.iter()
+fn solve(problems: Vec<Vec<u64>>, ops: Vec<Op>) -> u64 {
+    problems
+        .iter()
         .zip(ops.iter())
         .map(|(problem, op)| {
             let init = match op {
@@ -83,9 +122,10 @@ fn solve(nums: Vec<Vec<u64>>, ops: Vec<Op>) -> u64 {
 }
 
 fn part1(input: &str) -> anyhow::Result<String> {
-    let (nums, ops) = parse_input(input)?;
-    Ok(solve(nums, ops).to_string())
+    let (problems, ops) = parse_input(input)?;
+    Ok(solve(problems, ops).to_string())
 }
 fn part2(input: &str) -> anyhow::Result<String> {
-    Ok("0".to_string())
+    let (problems, ops) = parse_input2(input)?;
+    Ok(solve(problems, ops).to_string())
 }
