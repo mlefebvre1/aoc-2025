@@ -58,8 +58,30 @@ impl Grid {
             inner,
         }
     }
+    pub fn shape(&self) -> (usize, usize) {
+        (self.inner[0].len(), self.inner.len())
+    }
 
-    pub fn run(&mut self) -> anyhow::Result<usize> {
+    fn find_start(&self) -> Option<(isize, isize)> {
+        for (y, row) in self.inner.iter().enumerate() {
+            for (x, loc) in row.iter().enumerate() {
+                if let Loc::Start = loc {
+                    return Some((x as isize, y as isize));
+                }
+            }
+        }
+        None
+    }
+
+    /// Get a specific point mutably
+    fn get_mut(&mut self, loc: &(isize, isize)) -> Option<&mut Loc> {
+        if loc.0 < 0 || loc.1 < 0 {
+            return None;
+        }
+        self.inner.get_mut(loc.1 as usize)?.get_mut(loc.0 as usize)
+    }
+
+    pub fn run1(&mut self) -> anyhow::Result<usize> {
         let pos = self.find_start().ok_or(anyhow::anyhow!("No start found"))?;
         self.progress(pos);
         Ok(self.nb_splits)
@@ -83,8 +105,6 @@ impl Grid {
 
             match self.get_mut(&next_pos) {
                 None => {
-                    println!("Got here??");
-
                     return;
                 }
                 Some(loc) => match loc {
@@ -107,23 +127,37 @@ impl Grid {
         }
     }
 
-    fn find_start(&self) -> Option<(isize, isize)> {
-        for (y, row) in self.inner.iter().enumerate() {
-            for (x, loc) in row.iter().enumerate() {
-                if let Loc::Start = loc {
-                    return Some((x as isize, y as isize));
-                }
-            }
-        }
-        None
-    }
+    pub fn run2(&mut self) -> anyhow::Result<usize> {
+        let (xlen, _) = self.shape();
 
-    /// Get a specific point mutably
-    fn get_mut(&mut self, loc: &(isize, isize)) -> Option<&mut Loc> {
-        if loc.0 < 0 || loc.1 < 0 {
-            return None;
-        }
-        self.inner.get_mut(loc.1 as usize)?.get_mut(loc.0 as usize)
+        let final_counts = self
+            .inner
+            .iter()
+            .fold(vec![0usize; xlen], |prev_counts, lines| {
+                let mut new_counts = vec![0usize; xlen];
+                for (j, loc) in lines.iter().enumerate() {
+                    match loc {
+                        Loc::Start => {
+                            new_counts[j] = 1;
+                        }
+                        Loc::Space => {
+                            new_counts[j] += prev_counts[j];
+                        }
+                        Loc::Splitter => {
+                            if j > 0 {
+                                new_counts[j - 1] += prev_counts[j];
+                            }
+                            if j < xlen - 1 {
+                                new_counts[j + 1] += prev_counts[j];
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                new_counts
+            });
+
+        Ok(final_counts.iter().sum())
     }
 }
 
@@ -149,13 +183,14 @@ fn parse_input(input: &str) -> anyhow::Result<Grid> {
 
 fn part1(input: &str) -> anyhow::Result<String> {
     let mut grid = parse_input(input)?;
-    let ans = grid.run()?;
+    let ans = grid.run1()?;
 
     Ok(ans.to_string())
 }
 fn part2(input: &str) -> anyhow::Result<String> {
-    let grid = parse_input(input)?;
-    Ok("".to_string())
+    let mut grid = parse_input(input)?;
+    let ans = grid.run2()?;
+    Ok(ans.to_string())
 }
 
 #[cfg(test)]
