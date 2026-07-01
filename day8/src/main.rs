@@ -28,8 +28,8 @@ fn part1(input: &str, nb_iter: usize) -> anyhow::Result<String> {
     Ok(ans.to_string())
 }
 fn part2(input: &str) -> anyhow::Result<String> {
-    let mut jboxes = parse_input(input);
-    let ans = "";
+    let jboxes = parse_input(input);
+    let ans = solve2(jboxes)?;
     Ok(ans.to_string())
 }
 
@@ -168,7 +168,6 @@ fn sort_jbox_pairs_by_distance(jboxes: &[JunctionBox]) -> Vec<(&JunctionBox, &Ju
 fn solve(inital_jboxes: Vec<JunctionBox>, nb_iter: usize) -> anyhow::Result<usize> {
     let jbox_pairs = sort_jbox_pairs_by_distance(&inital_jboxes);
 
-    // let mut jboxes = inital_jboxes.clone();
     let mut circuits = Circuits::new(&inital_jboxes);
 
     for jbox_pair in jbox_pairs.into_iter().take(nb_iter) {
@@ -177,6 +176,30 @@ fn solve(inital_jboxes: Vec<JunctionBox>, nb_iter: usize) -> anyhow::Result<usiz
     }
 
     Ok(circuits.get_score()?)
+}
+
+fn solve2(inital_jboxes: Vec<JunctionBox>) -> anyhow::Result<usize> {
+    let jbox_pairs = sort_jbox_pairs_by_distance(&inital_jboxes);
+
+    let mut circuits = Circuits::new(&inital_jboxes);
+
+    // migrate junction boxes until we only have 1 circuit left,
+    // then return the last pair of junction boxes that made this condition true
+    let find_last_pair = || {
+        for jbox_pair in jbox_pairs.into_iter() {
+            let (jbox1, jbox2) = jbox_pair;
+            circuits.migrate(jbox1, jbox2);
+
+            if circuits.0.len() == 1 {
+                return Some((jbox1.clone(), jbox2.clone()));
+            }
+        }
+        None
+    };
+
+    let (p1, p2) = find_last_pair().expect("failed..");
+    let score = p1.x as usize * p2.x as usize;
+    Ok(score)
 }
 
 #[cfg(test)]
@@ -212,6 +235,6 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        //assert_eq!(part2(INPUT).unwrap(), "40");
+        assert_eq!(part2(INPUT).unwrap(), "25272");
     }
 }
