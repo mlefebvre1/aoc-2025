@@ -1,5 +1,6 @@
-use std::str::FromStr;
+use std::{str::FromStr, usize};
 
+use highs::{HighsModelStatus, RowProblem, Sense};
 use itertools::Itertools;
 
 fn main() -> anyhow::Result<()> {
@@ -43,7 +44,7 @@ impl FromStr for Button {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Joltage(Vec<usize>);
 impl FromStr for Joltage {
     type Err = anyhow::Error;
@@ -52,6 +53,21 @@ impl FromStr for Joltage {
         let s = s.replace('{', "").replace('}', "");
         let indexes = s.split(',').map(|i| i.parse::<usize>().unwrap()).collect();
         Ok(Joltage(indexes))
+    }
+}
+impl Joltage {
+    pub fn new(nb_joltage: usize) -> Self {
+        Self(vec![0; nb_joltage])
+    }
+    pub fn press(&mut self, button: &Button, count: usize) {
+        for &index in &button.0 {
+            self.0[index] += count;
+        }
+    }
+    pub fn unpress(&mut self, button: &Button, count: usize) {
+        for &index in &button.0 {
+            self.0[index] -= count;
+        }
     }
 }
 
@@ -126,9 +142,75 @@ fn part1(input: &str) -> anyhow::Result<String> {
         .sum::<usize>();
     Ok(ans.to_string())
 }
+
 fn part2(input: &str) -> anyhow::Result<String> {
-    let ans = "";
+    let ans = input
+        .split("\n")
+        .filter(|l| !l.is_empty())
+        .map(|line| {
+            let line = Line::from_str(line).unwrap();
+            let (matrix_a, matrix_b) = build_matrices(&line);
+            solve_matrices(matrix_a, matrix_b)
+        })
+        .sum::<usize>();
+
     Ok(ans.to_string())
+}
+
+fn build_matrices(line: &Line) -> (Vec<Vec<f64>>, Vec<f64>) {
+    // (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
+    // a*X3 + b*(X1 + X3) + c*X2 + d*(X2+X3) + e*(X0+X2) + f*(X0+X1) = 3*X0 + 5*X1 + 4*X2 + 7*X3
+    //
+    // e + f = 3
+    // b + f = 5
+    // c + d + e = 4
+    // a + b + d = 7
+    //
+    //  [0., 0., 0., 0., 1., 1.],
+    //  [0., 1., 0., 0., 0., 1.],
+    //  [0., 0., 1., 1., 1., 0.],
+    //  [1., 1., 0., 1., 0., 0.],
+    let mut matrix_a = vec![vec![0f64; line.buttons.len()]; line.joltage.0.len()];
+    let matrix_b = line.joltage.0.iter().map(|&x| x as f64).collect::<Vec<_>>();
+
+    for (counter_target, row) in matrix_a.iter_mut().enumerate() {
+        for (button_col, button) in line.buttons.iter().enumerate() {
+            for counter in button.0.iter() {
+                if *counter == counter_target {
+                    row[button_col] = 1.0;
+                }
+            }
+        }
+    }
+
+    (matrix_a, matrix_b)
+}
+fn solve_matrices(matrix_a: Vec<Vec<f64>>, matrix_b: Vec<f64>) -> usize {
+    // just use a linear equation solver.. way too much work to implement my own..
+    let matrix_c = vec![1.0; matrix_a[0].len()];
+    let mut pb = RowProblem::default();
+    let cols: Vec<_> = matrix_c
+        .iter()
+        .map(|&cost| pb.add_integer_column(cost, 0..))
+        .collect();
+    for (i, row) in matrix_a.iter().enumerate() {
+        let terms = cols
+            .iter()
+            .copied()
+            .zip(row.iter().copied())
+            .filter(|(_, v)| *v != 0.0);
+        pb.add_row(matrix_b[i]..=matrix_b[i], terms);
+    }
+
+    let solved = pb.optimise(Sense::Minimise).solve();
+    if solved.status() != HighsModelStatus::Optimal {
+        panic!(
+            "Failed to find optimal solution status: {:?}",
+            solved.status()
+        );
+    }
+
+    solved.objective_value() as usize
 }
 
 #[cfg(test)]
@@ -143,7 +225,8 @@ mod tests {
     fn test_part1() {
         assert_eq!(part1(INPUT).unwrap(), "7");
     }
+    #[test]
     fn test_part2() {
-        assert_eq!(part2(INPUT).unwrap(), "TBD");
+        assert_eq!(part2(INPUT).unwrap(), "33");
     }
 }

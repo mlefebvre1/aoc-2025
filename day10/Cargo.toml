@@ -7,3 +7,4 @@ edition = "2024"
 anyhow = "1"
 aoc = { path = "../aoc" }
 itertools = "0.15"
+highs = "2.4.0"
